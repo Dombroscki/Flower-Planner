@@ -1,0 +1,1873 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Planner">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="theme-color" content="#e8dcc8">
+  <title>Planner · Vintage</title>
+  
+  <link rel="apple-touch-icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect width='180' height='180' fill='%23fcfbf7'/><rect x='20' y='20' width='140' height='140' fill='none' stroke='%23b52b3b' stroke-width='4'/><text x='90' y='115' font-family='serif' font-size='80' text-anchor='middle' fill='%23b52b3b'>P</text></svg>">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;1,600&family=Quicksand:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    :root {
+      --fabric-bg: #e3d5c0;
+      --paper: #fcfbf7;
+      --paper-shadow: #d4c4a8;
+      --red: #b52b3b;
+      --red-light: #f4e8e8;
+      --red-dark: #8a1f16;
+      --ink: #2b2b2b;
+      --ink-soft: #666;
+      
+      /* Cores das Categorias */
+      --cat-red: #b52b3b;
+      --cat-green: #7cb342;
+      --cat-blue: #4a90e2;
+      --cat-pink: #ff9ec4;
+      --cat-yellow: #d4a827;
+      
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+    }
+
+    html, body {
+      height: 100%;
+      overflow: hidden;
+      font-family: 'Quicksand', -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 15px;
+      color: var(--ink);
+      background-color: var(--fabric-bg);
+      background-image: 
+        radial-gradient(circle at 15% 15%, rgba(181, 43, 59, 0.08) 2px, transparent 3px),
+        radial-gradient(circle at 85% 85%, rgba(181, 43, 59, 0.08) 2px, transparent 3px),
+        radial-gradient(circle at 50% 50%, rgba(181, 43, 59, 0.05) 4px, transparent 5px);
+      background-size: 60px 60px;
+      user-select: none;
+      -webkit-user-select: none;
+      overscroll-behavior: none;
+    }
+
+    /* ============ APP LAYOUT FIXO ============ */
+    .screen {
+      position: fixed;
+      top: 0; bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 100%;
+      max-width: 620px;
+      display: flex;
+      flex-direction: column;
+      padding: calc(var(--safe-top) + 14px) 12px calc(var(--safe-bottom) + 12px);
+      transition: transform 0.4s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.3s;
+      z-index: 5;
+    }
+    .screen.home { transform: translateX(-50%); }
+    .screen.home.hidden {
+      transform: translateX(-80%) scale(0.95);
+      opacity: 0;
+      pointer-events: none;
+    }
+    .screen.day {
+      transform: translateX(150%);
+      opacity: 0;
+      pointer-events: none;
+    }
+    .screen.day.visible {
+      transform: translateX(-50%);
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    /* ============ PAPER SHEET ============ */
+    .paper-sheet {
+      flex: 1;
+      min-height: 0;
+      background-color: var(--paper);
+      background-image: 
+        linear-gradient(90deg, rgba(0,0,0,0.01) 1px, transparent 1px),
+        linear-gradient(rgba(0,0,0,0.01) 1px, transparent 1px);
+      background-size: 20px 20px;
+      box-shadow: 
+        0 4px 12px rgba(0,0,0,0.15),
+        0 1px 3px rgba(0,0,0,0.1),
+        inset 0 0 40px rgba(0,0,0,0.02);
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      border-radius: 2px;
+    }
+    .paper-sheet::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      pointer-events: none;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.6);
+      z-index: 10;
+    }
+
+    /* ============================================================
+       HOME SCREEN - HEADER (Relógio e Localização)
+       ============================================================ */
+    .home-header {
+      flex-shrink: 0;
+      padding: 16px 20px 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      border-bottom: 1px dashed rgba(181, 43, 59, 0.2);
+      position: relative;
+      z-index: 2;
+    }
+    .clock-box {
+      display: flex;
+      flex-direction: column;
+    }
+    .clock {
+      font-family: 'Playfair Display', serif;
+      font-size: clamp(32px, 10vw, 46px);
+      line-height: 1;
+      color: var(--ink);
+      font-weight: 600;
+      letter-spacing: 1px;
+    }
+    .current-date {
+      font-family: 'Quicksand', sans-serif;
+      font-size: 13px;
+      color: var(--ink-soft);
+      text-transform: capitalize;
+      margin-top: 4px;
+      font-weight: 500;
+    }
+    .location-plaque {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      background: var(--red-light);
+      border: 1px solid rgba(181, 43, 59, 0.3);
+      border-radius: 20px;
+      font-size: 11px;
+      color: var(--red-dark);
+      font-weight: 600;
+      max-width: 50%;
+    }
+    .location-plaque .loc-text {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .loc-dot {
+      width: 6px; height: 6px;
+      background: var(--red);
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .location-plaque.locating .loc-dot {
+      background: #d4a827;
+      animation: blinkPix 1s steps(2) infinite;
+    }
+    @keyframes blinkPix {
+      0%, 100% { opacity: 1; }
+      50%      { opacity: 0.3; }
+    }
+    .location-plaque.locating .loc-text { font-style: italic; opacity: 0.8; }
+
+    /* ============================================================
+       CALENDÁRIO CLÁSSICO
+       ============================================================ */
+    .calendar-area {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      padding: 8px 16px 16px;
+      position: relative;
+      z-index: 2;
+    }
+
+    .cal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center; 
+      margin-bottom: 12px;
+      flex-shrink: 0;
+      gap: 12px;
+    }
+    
+    /* Banner Floral */
+    .decor-flower-img {
+      flex: 1;
+      max-width: 80%;
+      max-height: 165px; 
+      width: auto;
+      object-fit: contain;
+      object-position: left center;
+      border: none;
+      border-radius: 0;
+      box-shadow: none;
+      background: transparent;
+    }
+    
+    .month-vertical-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    
+    .month-vertical {
+      writing-mode: vertical-rl;
+      text-orientation: mixed;
+      font-family: 'Playfair Display', serif;
+      font-size: clamp(24px, 8vw, 30px); 
+      color: var(--red);
+      font-weight: 600;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      margin: 0;
+      line-height: 1;
+    }
+    
+    .cal-controls {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .cal-btn {
+      width: 28px; height: 28px;
+      border: 1px solid var(--red);
+      background: var(--paper);
+      color: var(--red);
+      border-radius: 50%;
+      font-size: 14px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s;
+    }
+    .cal-btn:active {
+      background: var(--red);
+      color: var(--paper);
+      transform: scale(0.9);
+    }
+
+    .weekday-row {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      border-bottom: 1px solid var(--red);
+      padding-bottom: 4px;
+      margin-bottom: 0;
+      flex-shrink: 0;
+    }
+    .cal-weekday {
+      font-family: 'Quicksand', sans-serif;
+      font-size: 10px;
+      text-align: center;
+      color: var(--ink-soft);
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+    .cal-weekday.sunday-label {
+      color: var(--red);
+    }
+
+    .grid-container {
+      width: 100%;
+      border-top: 1px solid var(--red);
+      border-left: 1px solid var(--red);
+      background: var(--paper);
+    }
+
+    .cal-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      width: 100%;
+    }
+
+    .cal-day {
+      position: relative;
+      background: transparent;
+      border-right: 1px solid var(--red);
+      border-bottom: 1px solid var(--red);
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      justify-content: flex-start;
+      padding: 4px;
+      cursor: pointer;
+      aspect-ratio: 1 / 1;
+      min-height: 40px;
+      transition: background 0.1s, transform 0.1s;
+      overflow: hidden;
+    }
+    
+    .cal-day::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image: var(--daily-flor, none); 
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      opacity: 0.85; 
+      filter: brightness(1.05);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .cal-day:active {
+      background: var(--red-light);
+    }
+    
+    .cal-day .day-num {
+      font-family: 'Quicksand', sans-serif;
+      font-size: clamp(13px, 3.8vw, 16px);
+      line-height: 1;
+      color: var(--ink);
+      font-weight: 900;
+      position: relative;
+      z-index: 2;
+      text-shadow: 
+        -1px -1px 0 #fff,  
+         1px -1px 0 #fff,
+        -1px  1px 0 #fff,
+         1px  1px 0 #fff,
+         0px  0px 4px rgba(255,255,255,1),
+         2px  2px 4px rgba(0,0,0,0.3);
+    }
+    
+    .cal-day.sunday .day-num,
+    .cal-day.holiday .day-num {
+      color: var(--red);
+      font-weight: 900;
+    }
+    
+    .cal-day.other-month { opacity: 0.25; }
+    .cal-day.today { background: var(--red-light); }
+    .cal-day.today .day-num { color: var(--red-dark); font-weight: 900; }
+    .cal-day.today::after {
+      content: '';
+      position: absolute;
+      top: 4px; right: 4px;
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--red);
+      z-index: 2;
+      box-shadow: 0 0 0 1px #fff;
+    }
+    
+    .cal-day.selected {
+      background: var(--red-light) !important;
+      box-shadow: inset 0 0 0 3px var(--red);
+    }
+    .cal-day.selected .day-num { color: var(--red-dark); font-weight: 900; }
+
+    .color-dots-calendar {
+      position: absolute;
+      bottom: 4px;
+      right: 4px;
+      display: flex;
+      gap: 3px; 
+      z-index: 2;
+    }
+    .color-dots-calendar .mini-dot {
+      width: 10px; 
+      height: 10px;
+      border-radius: 50%;
+      box-shadow: 0 0 0 1.5px rgba(255,255,255,0.9), 0 1px 3px rgba(0,0,0,0.3);
+    }
+
+    /* ============================================================
+       DAY SCREEN (Tela do Dia)
+       ============================================================ */
+    .day-header {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 16px 20px;
+      border-bottom: 1px dashed rgba(181, 43, 59, 0.3);
+    }
+    .back-btn {
+      width: 36px; height: 36px;
+      border: 1px solid var(--red);
+      background: var(--paper);
+      color: var(--red);
+      border-radius: 50%;
+      font-size: 14px;
+      cursor: pointer;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s;
+    }
+    .back-btn:active {
+      background: var(--red);
+      color: var(--paper);
+      transform: scale(0.9);
+    }
+    .day-header-text { flex: 1; min-width: 0; }
+    .day-title {
+      font-family: 'Playfair Display', serif;
+      font-size: clamp(18px, 5vw, 22px);
+      color: var(--ink);
+      line-height: 1.1;
+      text-transform: capitalize;
+      font-weight: 600;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .day-sub {
+      font-family: 'Quicksand', sans-serif;
+      font-size: 12px;
+      color: var(--red);
+      margin-top: 3px;
+      font-weight: 600;
+    }
+
+    .hourly-list {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      padding: 12px 16px;
+    }
+    .hourly-list::-webkit-scrollbar { width: 0; }
+
+    .hour-row {
+      display: flex;
+      align-items: stretch;
+      gap: 12px;
+      padding: 12px 4px;
+      cursor: pointer;
+      border-bottom: 1px solid rgba(181, 43, 59, 0.1);
+      transition: background 0.15s;
+    }
+    .hour-row:active { background: var(--red-light); }
+    .hour-row.current {
+      background: var(--red-light);
+      border-left: 3px solid var(--red);
+      padding-left: 8px;
+      margin-left: -8px;
+    }
+    .hour-time {
+      font-family: 'Playfair Display', serif;
+      font-size: 16px;
+      color: var(--ink-soft);
+      min-width: 50px;
+      display: flex;
+      align-items: center;
+      font-style: italic;
+    }
+    .hour-row.current .hour-time { color: var(--red-dark); font-weight: 600; }
+    
+    .hour-cat-dot {
+      width: 16px; height: 16px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      box-shadow: 0 0 0 1.5px rgba(255,255,255,0.9), 0 1px 3px rgba(0,0,0,0.2);
+    }
+
+    .hour-body {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .hour-icon { font-size: 14px; }
+    .hour-note {
+      flex: 1;
+      min-width: 0;
+      font-family: 'Quicksand', sans-serif;
+      font-size: 14px;
+      color: var(--ink);
+      font-weight: 500;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .hour-empty {
+      flex: 1;
+      font-family: 'Quicksand', sans-serif;
+      font-size: 13px;
+      color: rgba(181, 43, 59, 0.3);
+      font-style: italic;
+    }
+
+    /* ============================================================
+       MODAL EDITOR (O "Diário")
+       ============================================================ */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(40, 30, 20, 0.6);
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: max(4vh, 20px) 16px 20px;
+      z-index: 100;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s;
+    }
+    .modal-overlay.active { opacity: 1; pointer-events: auto; }
+    
+    .modal {
+      position: relative;
+      width: 100%;
+      max-width: 440px;
+      max-height: 90vh;
+      overflow-y: auto;
+      background: var(--paper);
+      border-radius: 4px;
+      padding: 16px;
+      box-shadow: 
+        0 10px 30px rgba(0,0,0,0.3),
+        inset 0 0 0 1px rgba(181, 43, 59, 0.2);
+      transform: scale(0.9) translateY(20px);
+      opacity: 0;
+      transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.2s;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .modal-overlay.active .modal {
+      transform: scale(1) translateY(0);
+      opacity: 1;
+    }
+
+    /* Cabeçalho do Modal */
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+    .modal-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 16px;
+      color: var(--red-dark);
+      font-weight: 600;
+    }
+    .modal-subtitle {
+      font-family: 'Quicksand', sans-serif;
+      font-size: 12px;
+      color: var(--ink-soft);
+      text-transform: capitalize;
+      margin-top: 2px;
+    }
+
+    /* Área de Texto */
+    .note-input-wrapper {
+      border-radius: 4px;
+      overflow: hidden;
+      border: 1px solid rgba(181, 43, 59, 0.2);
+      background-color: #fdf6e2;
+    }
+    .modal textarea {
+      display: block;
+      width: 100%;
+      min-height: 120px;
+      padding: 12px;
+      font-family: 'Quicksand', sans-serif;
+      font-size: 15px;
+      line-height: 1.5;
+      color: var(--ink);
+      background: transparent;
+      border: none;
+      resize: vertical;
+      outline: none;
+    }
+    .modal textarea::placeholder { color: rgba(181, 43, 59, 0.4); font-style: italic; }
+
+    /* Ferramentas */
+    .toolbar {
+      display: flex;
+      gap: 8px;
+      background: rgba(181, 43, 59, 0.04);
+      padding: 6px;
+      border-radius: 6px;
+      border: 1px solid rgba(181, 43, 59, 0.1);
+      justify-content: space-between;
+    }
+    .tool-btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 12px;
+      border-radius: 4px;
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--ink-soft);
+      font-family: 'Quicksand', sans-serif;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .tool-btn:hover, .tool-btn.active {
+      background: rgba(181, 43, 59, 0.1);
+      border-color: rgba(181, 43, 59, 0.3);
+      color: var(--red-dark);
+    }
+
+    /* Painel de Personalização do Marcador */
+    .marker-panel {
+      display: none;
+      flex-direction: column;
+      gap: 12px;
+      background: rgba(255,255,255,0.7);
+      padding: 12px;
+      border-radius: 6px;
+      border: 1px dashed rgba(181, 43, 59, 0.3);
+      animation: slideDown 0.2s ease;
+    }
+    .marker-panel.visible { display: flex; }
+    @keyframes slideDown {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .marker-preview-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .marker-preview-dot {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15), inset 0 0 0 2px rgba(255,255,255,0.5);
+    }
+    .marker-controls {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .slider-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--ink-soft);
+    }
+    .slider-group input[type="range"] {
+      flex: 1;
+      appearance: none;
+      height: 6px;
+      border-radius: 3px;
+      background: #e0d4b8;
+      outline: none;
+    }
+    .slider-group input[type="range"]::-webkit-slider-thumb {
+      appearance: none;
+      width: 16px; height: 16px;
+      border-radius: 50%;
+      background: var(--red);
+      cursor: pointer;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    }
+    
+    .color-input-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .color-input-wrapper input[type="color"] {
+      width: 32px;
+      height: 32px;
+      border: none;
+      border-radius: 50%;
+      cursor: pointer;
+      padding: 0;
+      background: transparent;
+    }
+    .color-input-wrapper input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+    .color-input-wrapper input[type="color"]::-webkit-color-swatch { border: 2px solid #fff; border-radius: 50%; box-shadow: 0 1px 4px rgba(0,0,0,0.2); }
+
+    /* Checklist */
+    .checklist-area {
+      display: none;
+      flex-direction: column;
+      gap: 6px;
+      background: rgba(255,255,255,0.5);
+      padding: 8px;
+      border-radius: 4px;
+      border: 1px dashed rgba(181, 43, 59, 0.2);
+    }
+    .checklist-area.visible { display: flex; }
+    .checklist-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+    }
+    .checklist-item input[type="checkbox"] {
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      border: 2px solid var(--red);
+      border-radius: 3px;
+      cursor: pointer;
+      position: relative;
+      flex-shrink: 0;
+    }
+    .checklist-item input[type="checkbox"]:checked { background: var(--red); }
+    .checklist-item input[type="checkbox"]:checked::after {
+      content: '✔'; position: absolute; top: -1px; left: 2px; color: white; font-size: 12px;
+    }
+    .checklist-item input[type="checkbox"]:checked + span { text-decoration: line-through; color: var(--ink-soft); }
+    .checklist-add { display: flex; gap: 6px; margin-top: 4px; }
+    .checklist-add input {
+      flex: 1; padding: 6px 8px; border: 1px solid rgba(181, 43, 59, 0.2);
+      border-radius: 4px; font-family: 'Quicksand', sans-serif; font-size: 13px; outline: none;
+    }
+    .checklist-add button {
+      padding: 0 10px; background: var(--red); color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;
+    }
+
+    /* Mídia */
+    .media-preview { margin-top: 4px; display: none; }
+    .media-preview.visible { display: block; }
+    .preview-wrap { border: 1px solid rgba(181, 43, 59, 0.3); background: #000; border-radius: 4px; overflow: hidden; position: relative;}
+    .preview-label { background: var(--red-light); padding: 4px 8px; font-size: 10px; display: flex; justify-content: space-between; font-weight: bold; color: var(--red-dark);}
+    .media-preview img, .media-preview video { width: 100%; max-height: 120px; object-fit: contain; display: block;}
+    .media-preview audio { width: 100%; padding: 4px; background: #f9f9f9;}
+    .remove-media { background: none; border: none; color: var(--red); cursor: pointer; }
+
+    .media-actions {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+    }
+    .media-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      padding: 8px 4px;
+      border: 1px solid rgba(181, 43, 59, 0.2);
+      background: transparent;
+      border-radius: 4px;
+      color: var(--ink-soft);
+      font-size: 10px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .media-btn .mb-icon { font-size: 16px; }
+    .media-btn:active { background: var(--red-light); }
+
+    /* Botões Finais */
+    .modal-footer {
+      display: flex;
+      gap: 10px;
+      margin-top: 4px;
+    }
+    .modal-btn {
+      flex: 1;
+      padding: 12px;
+      border: 1px solid rgba(181, 43, 59, 0.3);
+      background: transparent;
+      border-radius: 4px;
+      font-family: 'Quicksand', sans-serif;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .modal-btn.cancel { color: var(--ink-soft); }
+    .modal-btn.save { background: var(--red); color: white; border-color: var(--red); }
+    .modal-btn.delete { width: 100%; color: var(--red); border-color: var(--red); margin-top: 4px; }
+  </style>
+</head>
+<body>
+
+  <!-- ========== HOME ========== -->
+  <section class="screen home" id="screenHome">
+    <div class="paper-sheet" id="calendarCard">
+      
+      <div class="home-header">
+        <div class="clock-box">
+          <div class="clock" id="clockLabel">00:00</div>
+          <div class="current-date" id="currentDateLabel">carregando…</div>
+        </div>
+        <div class="location-plaque locating" id="locationPlaque">
+          <span class="loc-dot"></span>
+          <span class="loc-text" id="locationText">localizando…</span>
+        </div>
+      </div>
+
+      <div class="calendar-area">
+        <div class="cal-header">
+          <img class="decor-flower-img" id="headerFlower" src="flor1.jpg" alt="Flor do dia">
+          <div class="month-vertical-wrap">
+            <div class="month-vertical" id="calendarTitle">Mês</div>
+            <div class="cal-controls">
+              <button class="cal-btn" id="prevMonth">‹</button>
+              <button class="cal-btn" id="nextMonth">›</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="weekday-row">
+          <div class="cal-weekday sunday-label">Dom</div>
+          <div class="cal-weekday">Seg</div>
+          <div class="cal-weekday">Ter</div>
+          <div class="cal-weekday">Qua</div>
+          <div class="cal-weekday">Qui</div>
+          <div class="cal-weekday">Sex</div>
+          <div class="cal-weekday">Sáb</div>
+        </div>
+
+        <div class="grid-container">
+          <div class="cal-grid" id="calendarGrid"></div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ========== DIA ========== -->
+  <section class="screen day" id="screenDay">
+    <div class="paper-sheet">
+      <div class="day-header">
+        <button class="back-btn" id="backBtn">‹</button>
+        <div class="day-header-text">
+          <div class="day-title" id="dayTitleLabel">—</div>
+          <div class="day-sub" id="daySubLabel"></div>
+        </div>
+      </div>
+      <div class="hourly-list" id="hourlyList"></div>
+    </div>
+  </section>
+
+  <!-- ========== MODAL NOVO (DIÁRIO) ========== -->
+  <div class="modal-overlay" id="modalOverlay" role="dialog" aria-modal="true">
+    <div class="modal" id="modalWindow">
+      
+      <div class="modal-header">
+        <div>
+          <div class="modal-title" id="modalTitle">Diário</div>
+          <div class="modal-subtitle" id="modalSubtitle">—</div>
+        </div>
+      </div>
+
+      <!-- Editor Principal -->
+      <div class="note-input-wrapper">
+        <textarea id="noteInput" placeholder="escreva no seu diário…" maxlength="1000"></textarea>
+      </div>
+
+      <!-- Ferramentas -->
+      <div class="toolbar">
+        <button class="tool-btn" id="toggleMarkerBtn">
+          🎨 Marcador
+        </button>
+        <button class="tool-btn" id="toggleChecklistBtn">
+          ☑️ Checklist
+        </button>
+        <button class="tool-btn" id="toggleMediaBtn">
+          📎 Mídia
+        </button>
+      </div>
+
+      <!-- Painel de Marcador (Oculto por padrão) -->
+      <div class="marker-panel" id="markerPanel">
+        <div class="marker-preview-row">
+          <span style="font-size:12px; font-weight:700; color:var(--red-dark);">Sua Bolinha:</span>
+          <div class="marker-preview-dot" id="markerPreviewDot"></div>
+        </div>
+        <div class="color-input-wrapper">
+          <input type="color" id="markerColorInput" value="#b52b3b">
+          <span style="font-size:11px; color:var(--ink-soft);">Escolha a cor</span>
+        </div>
+        <div class="marker-controls">
+          <div class="slider-group">
+            <span>Brilho</span>
+            <input type="range" id="markerBrightness" min="30" max="200" value="100">
+            <span id="brightnessLabel">100%</span>
+          </div>
+          <div class="slider-group">
+            <span>Contraste</span>
+            <input type="range" id="markerContrast" min="30" max="200" value="100">
+            <span id="contrastLabel">100%</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Painel de Checklist -->
+      <div class="checklist-area" id="checklistArea">
+        <div id="checklistItems"></div>
+        <div class="checklist-add">
+          <input type="text" id="newChecklistText" placeholder="Nova tarefa...">
+          <button id="addChecklistBtn">+</button>
+        </div>
+      </div>
+
+      <!-- Mídia (Oculta por padrão) -->
+      <div id="mediaSection" style="display:none;">
+        <div class="media-preview" id="mediaPreview"></div>
+        <div class="media-actions">
+          <button class="media-btn" data-action="photo"><span class="mb-icon">📷</span> Foto</button>
+          <button class="media-btn" data-action="video"><span class="mb-icon">🎬</span> Vídeo</button>
+          <button class="media-btn" data-action="audio" id="audioBtn"><span class="mb-icon">🎤</span> <span id="audioBtnLabel">Áudio</span></button>
+          <button class="media-btn" data-action="clear" id="clearMediaBtn"><span class="mb-icon">✕</span> Limpar</button>
+        </div>
+        <input type="file" accept="image/*" capture="environment" id="photoInput" style="display:none">
+        <input type="file" accept="video/*" capture="environment" id="videoInput" style="display:none">
+      </div>
+
+      <div class="modal-footer">
+        <button class="modal-btn cancel" id="cancelBtn">Cancelar</button>
+        <button class="modal-btn save" id="saveBtn">Salvar</button>
+      </div>
+      <button class="modal-btn delete" id="deleteBtn" style="display:none;">Apagar diário</button>
+
+    </div>
+  </div>
+
+  <script>
+    /* ============================================================
+       1. ÁUDIO
+       ============================================================ */
+    let audioCtx = null;
+    function initAudio() {
+      if (!audioCtx) {
+        try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+        catch (e) { return null; }
+      }
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      return audioCtx;
+    }
+
+    function playKnock() {
+      initAudio(); if (!audioCtx) return;
+      const t = audioCtx.currentTime;
+      const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(600, t);
+      o.frequency.exponentialRampToValueAtTime(300, t + 0.05);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.05, t + 0.005);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.06);
+      o.connect(g); g.connect(audioCtx.destination);
+      o.start(t); o.stop(t + 0.08);
+    }
+
+    function playSaveChime() {
+      initAudio(); if (!audioCtx) return;
+      [440, 554.37, 659.25].forEach((f, i) => {
+        const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+        o.type = 'sine'; o.frequency.value = f;
+        const t = audioCtx.currentTime + i * 0.08;
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(0.05, t + 0.01);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.4);
+        o.connect(g); g.connect(audioCtx.destination);
+        o.start(t); o.stop(t + 0.45);
+      });
+    }
+
+    /* ============================================================
+       2. BANCO (IndexedDB)
+       ============================================================ */
+    let db = null;
+    const DB_NAME = 'plannerDB_v3';
+
+    function openDB() {
+      return new Promise((res, rej) => {
+        const req = indexedDB.open(DB_NAME, 1);
+        req.onupgradeneeded = (e) => {
+          const d = e.target.result;
+          if (!d.objectStoreNames.contains('notes')) {
+            const s = d.createObjectStore('notes', { keyPath: 'id', autoIncrement: true });
+            s.createIndex('date', 'date', { unique: false });
+          }
+        };
+        req.onsuccess = (e) => { db = e.target.result; res(db); };
+        req.onerror = (e) => rej(e.target.error);
+      });
+    }
+
+    function dbAdd(note) {
+      return new Promise((res, rej) => {
+        const tx = db.transaction('notes', 'readwrite');
+        const r = tx.objectStore('notes').add(note);
+        r.onsuccess = () => res(r.result);
+        r.onerror = () => rej(r.error);
+      });
+    }
+    function dbUpdate(id, data) {
+      return new Promise((res, rej) => {
+        const tx = db.transaction('notes', 'readwrite');
+        const store = tx.objectStore('notes');
+        const g = store.get(id);
+        g.onsuccess = () => {
+          const merged = { ...g.result, ...data, id };
+          const p = store.put(merged);
+          p.onsuccess = () => res();
+          p.onerror = () => rej(p.error);
+        };
+        g.onerror = () => rej(g.error);
+      });
+    }
+    function dbDelete(id) {
+      return new Promise((res, rej) => {
+        const tx = db.transaction('notes', 'readwrite');
+        const r = tx.objectStore('notes').delete(id);
+        r.onsuccess = () => res();
+        r.onerror = () => rej(r.error);
+      });
+    }
+    function dbGetByDate(dateStr) {
+      return new Promise((res, rej) => {
+        const tx = db.transaction('notes', 'readonly');
+        const idx = tx.objectStore('notes').index('date');
+        const r = idx.getAll(dateStr);
+        r.onsuccess = () => res(r.result);
+        r.onerror = () => rej(r.error);
+      });
+    }
+
+    /* ============================================================
+       3. ESTADO
+       ============================================================ */
+    const state = {
+      year: new Date().getFullYear(),
+      month: new Date().getMonth(),
+      selectedDate: new Date(),
+      notesCache: {},
+      editingHour: null,
+      editingNoteId: null,
+      pendingMedia: null,
+      
+      // Configurações do Marcador
+      markerColor: '#b52b3b',
+      markerBrightness: 100,
+      markerContrast: 100,
+      
+      checklist: [],
+      currentView: 'home',
+      monthAnimating: false,
+      isRecording: false,
+      mediaRecorder: null,
+      audioChunks: [],
+      recordingStream: null
+    };
+
+    const MONTHS = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+    const WEEKDAYS_LONG = ['Domingo','Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado'];
+
+    const HOLIDAYS = [
+      { m: 0, d: 1 }, { m: 3, d: 21 }, { m: 4, d: 1 }, { m: 8, d: 7 },
+      { m: 9, d: 12 }, { m: 10, d: 2 }, { m: 10, d: 15 }, { m: 10, d: 20 }, { m: 11, d: 25 }
+    ];
+    function isHoliday(date) {
+      return HOLIDAYS.some(h => h.m === date.getMonth() && h.d === date.getDate());
+    }
+    function isSunday(date) { return date.getDay() === 0; }
+
+    /* ============================================================
+       4. UTILS
+       ============================================================ */
+    const pad2 = (n) => String(n).padStart(2, '0');
+    const dateKey = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+    const isSameDay = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+    const isToday = (d) => isSameDay(d, new Date());
+    const wait = (ms) => new Promise(r => setTimeout(r, ms));
+
+    /* ============================================================
+       5. RELÓGIO
+       ============================================================ */
+    function updateClock() {
+      const now = new Date();
+      document.getElementById('clockLabel').textContent =
+        `${pad2(now.getHours())}:${pad2(now.getMinutes())}`;
+      document.getElementById('currentDateLabel').textContent =
+        now.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
+      if (state.currentView === 'day' && isToday(state.selectedDate)) highlightCurrentHour();
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    /* ============================================================
+       6. GEOLOCALIZAÇÃO
+       ============================================================ */
+    async function initLocation() {
+      const plaque = document.getElementById('locationPlaque');
+      const label = document.getElementById('locationText');
+      if (!('geolocation' in navigator)) {
+        plaque.classList.remove('locating');
+        label.textContent = 'Offline';
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        async (pos) => {
+          const { latitude, longitude } = pos.coords;
+          let placeText = null;
+          try {
+            const controller = new AbortController();
+            const tid = setTimeout(() => controller.abort(), 4500);
+            const res = await fetch(
+              `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=10&addressdetails=1&accept-language=pt-BR`,
+              { signal: controller.signal }
+            );
+            clearTimeout(tid);
+            if (res.ok) {
+              const data = await res.json();
+              const a = data.address || {};
+              const city = a.city || a.town || a.village || a.municipality || a.county;
+              if (city) placeText = city;
+            }
+          } catch (e) {}
+          if (!placeText) {
+            placeText = `${latitude.toFixed(1)}°, ${longitude.toFixed(1)}°`;
+          }
+          label.textContent = placeText;
+          plaque.classList.remove('locating');
+        },
+        (err) => {
+          plaque.classList.remove('locating');
+          label.textContent = 'Sem localização';
+        },
+        { timeout: 8000, enableHighAccuracy: false, maximumAge: 300000 }
+      );
+    }
+
+    /* ============================================================
+       7. CALENDÁRIO
+       ============================================================ */
+    function updateHeaderFlower(day) {
+      const florNumber = Math.min(day, 31);
+      document.getElementById('headerFlower').src = `flor${florNumber}.jpg`;
+    }
+
+    function renderCalendar() {
+      document.getElementById('calendarTitle').textContent = MONTHS[state.month];
+
+      const grid = document.getElementById('calendarGrid');
+      grid.innerHTML = '';
+
+      const y = state.year, m = state.month;
+      const firstDow = new Date(y, m, 1).getDay();
+      const daysInMonth = new Date(y, m + 1, 0).getDate();
+      const prevLastDay = new Date(y, m, 0).getDate();
+
+      let cellIndex = 0;
+
+      for (let i = firstDow - 1; i >= 0; i--) {
+        grid.appendChild(makeDayCell(prevLastDay - i, y, m - 1, true, cellIndex++));
+      }
+      for (let d = 1; d <= daysInMonth; d++) {
+        grid.appendChild(makeDayCell(d, y, m, false, cellIndex++));
+      }
+      const remaining = (7 - (cellIndex % 7)) % 7;
+      for (let i = 1; i <= remaining; i++) {
+        grid.appendChild(makeDayCell(i, y, m + 1, true, cellIndex++));
+      }
+    }
+
+    function makeDayCell(day, y, m, otherMonth, cellIndex) {
+      const el = document.createElement('div');
+      el.className = 'cal-day';
+      
+      el.style.setProperty('--daily-flor', `url('flor${day}.jpg')`);
+
+      if (otherMonth) el.classList.add('other-month');
+
+      const date = new Date(y, m, day);
+      if (isSunday(date)) el.classList.add('sunday');
+      if (isHoliday(date)) el.classList.add('holiday');
+      if (isToday(date)) el.classList.add('today');
+      if (isSameDay(date, state.selectedDate)) el.classList.add('selected');
+
+      const num = document.createElement('div');
+      num.className = 'day-num';
+      num.textContent = day;
+      el.appendChild(num);
+
+      const dk = dateKey(date);
+      const notes = state.notesCache[dk] || [];
+      
+      if (notes.length > 0) {
+        const uniqueColors = new Set();
+        notes.forEach(n => { if (n.color) uniqueColors.add(n.color); });
+        
+        if (uniqueColors.size > 0) {
+          const colorContainer = document.createElement('div');
+          colorContainer.className = 'color-dots-calendar';
+          Array.from(uniqueColors).slice(0, 3).forEach(c => {
+            const dot = document.createElement('span');
+            dot.className = 'mini-dot';
+            dot.style.backgroundColor = c;
+            colorContainer.appendChild(dot);
+          });
+          el.appendChild(colorContainer);
+        }
+      }
+
+      el.addEventListener('click', () => {
+        if (suppressClick) { suppressClick = false; return; }
+        playKnock();
+        state.selectedDate = date;
+        state.year = date.getFullYear();
+        state.month = date.getMonth();
+        showDayScreen();
+      });
+
+      return el;
+    }
+
+    /* ============================================================
+       8. TRANSIÇÕES
+       ============================================================ */
+    function showDayScreen() {
+      state.currentView = 'day';
+      renderDayScreen();
+      updateHeaderFlower(state.selectedDate.getDate());
+      
+      document.getElementById('screenHome').classList.add('hidden');
+      document.getElementById('screenDay').classList.add('visible');
+    }
+    
+    function showHomeScreen() {
+      state.currentView = 'home';
+      document.getElementById('screenDay').classList.remove('visible');
+      document.getElementById('screenHome').classList.remove('hidden');
+      updateHeaderFlower(state.selectedDate.getDate());
+      renderCalendar();
+    }
+    
+    document.getElementById('backBtn').addEventListener('click', () => {
+      playKnock();
+      showHomeScreen();
+    });
+
+    /* ============================================================
+       9. TELA DO DIA
+       ============================================================ */
+    function renderDayScreen() {
+      const d = state.selectedDate;
+      const weekday = WEEKDAYS_LONG[d.getDay()];
+      document.getElementById('dayTitleLabel').textContent =
+        `${weekday}, ${d.getDate()} de ${MONTHS[d.getMonth()]}`;
+      const now = new Date();
+      let sub;
+      if (isToday(d)) sub = 'Hoje';
+      else if (isSameDay(d, new Date(now.getTime() - 86400000))) sub = 'Ontem';
+      else if (isSameDay(d, new Date(now.getTime() + 86400000))) sub = 'Amanhã';
+      else sub = `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}/${d.getFullYear()}`;
+      document.getElementById('daySubLabel').textContent = sub;
+      renderHourlyList();
+    }
+
+    function renderHourlyList() {
+      const list = document.getElementById('hourlyList');
+      list.innerHTML = '';
+      const dk = dateKey(state.selectedDate);
+      const dayNotes = state.notesCache[dk] || [];
+      const currentHour = new Date().getHours();
+      const todayView = isToday(state.selectedDate);
+
+      for (let h = 0; h < 24; h++) {
+        const row = document.createElement('div');
+        row.className = 'hour-row';
+        row.dataset.hour = h;
+        if (todayView && h === currentHour) row.classList.add('current');
+
+        const time = document.createElement('div');
+        time.className = 'hour-time';
+        time.textContent = `${pad2(h)}:00`;
+        row.appendChild(time);
+
+        const body = document.createElement('div');
+        body.className = 'hour-body';
+
+        const note = dayNotes.find(n => n.hour === h);
+        if (note) {
+          // Marcador com Filtros
+          if (note.color) {
+            const dot = document.createElement('span');
+            dot.className = 'hour-cat-dot';
+            dot.style.backgroundColor = note.color;
+            const b = note.brightness || 100;
+            const c = note.contrast || 100;
+            dot.style.filter = `brightness(${b}%) contrast(${c}%)`;
+            body.appendChild(dot);
+          }
+
+          const icons = [];
+          if (note.mediaType === 'photo') icons.push('📷');
+          if (note.mediaType === 'video') icons.push('🎬');
+          if (note.mediaType === 'audio') icons.push('🎤');
+          if (note.text && note.text.trim()) icons.push('📝');
+          if (note.checklist && note.checklist.length > 0) icons.push('☑️');
+          if (icons.length === 0 && !note.color) icons.push('📝');
+
+          if (icons.length > 0) {
+            const iconEl = document.createElement('span');
+            iconEl.className = 'hour-icon';
+            iconEl.textContent = icons.join('');
+            body.appendChild(iconEl);
+          }
+
+          const noteEl = document.createElement('div');
+          noteEl.className = 'hour-note';
+          noteEl.textContent = note.text && note.text.trim() ? note.text : '(mídia/tarefas)';
+          body.appendChild(noteEl);
+        } else {
+          const empty = document.createElement('span');
+          empty.className = 'hour-empty';
+          empty.textContent = '+ adicionar nota';
+          body.appendChild(empty);
+        }
+
+        row.appendChild(body);
+        row.addEventListener('click', () => openNoteModal(h, note));
+        list.appendChild(row);
+      }
+    }
+    function highlightCurrentHour() {
+      const h = new Date().getHours();
+      document.querySelectorAll('.hour-row').forEach(r => {
+        r.classList.toggle('current', parseInt(r.dataset.hour, 10) === h);
+      });
+    }
+
+    /* ============================================================
+       10. MODAL (DIÁRIO COMPLETO)
+       ============================================================ */
+    const overlay = document.getElementById('modalOverlay');
+    const modalWindow = document.getElementById('modalWindow');
+    const noteInput = document.getElementById('noteInput');
+    const mediaPreview = document.getElementById('mediaPreview');
+    const deleteRow = document.getElementById('deleteBtn');
+    const audioBtn = document.getElementById('audioBtn');
+    const audioBtnLabel = document.getElementById('audioBtnLabel');
+    const photoInput = document.getElementById('photoInput');
+    const videoInput = document.getElementById('videoInput');
+    
+    const toggleMarkerBtn = document.getElementById('toggleMarkerBtn');
+    const markerPanel = document.getElementById('markerPanel');
+    const markerColorInput = document.getElementById('markerColorInput');
+    const markerBrightness = document.getElementById('markerBrightness');
+    const markerContrast = document.getElementById('markerContrast');
+    const markerPreviewDot = document.getElementById('markerPreviewDot');
+    const brightnessLabel = document.getElementById('brightnessLabel');
+    const contrastLabel = document.getElementById('contrastLabel');
+
+    const toggleChecklistBtn = document.getElementById('toggleChecklistBtn');
+    const checklistArea = document.getElementById('checklistArea');
+    const checklistItemsDiv = document.getElementById('checklistItems');
+    const newChecklistText = document.getElementById('newChecklistText');
+    const addChecklistBtn = document.getElementById('addChecklistBtn');
+
+    const toggleMediaBtn = document.getElementById('toggleMediaBtn');
+    const mediaSection = document.getElementById('mediaSection');
+
+    // Atualiza o preview da bolinha com base nas configurações
+    function updateMarkerPreview() {
+      markerPreviewDot.style.backgroundColor = state.markerColor;
+      markerPreviewDot.style.filter = `brightness(${state.markerBrightness}%) contrast(${state.markerContrast}%)`;
+      brightnessLabel.textContent = `${state.markerBrightness}%`;
+      contrastLabel.textContent = `${state.markerContrast}%`;
+    }
+
+    // Alternadores de Ferramentas
+    toggleMarkerBtn.addEventListener('click', () => {
+      markerPanel.classList.toggle('visible');
+      toggleMarkerBtn.classList.toggle('active');
+      if (markerPanel.classList.contains('visible')) {
+        checklistArea.classList.remove('visible');
+        toggleChecklistBtn.classList.remove('active');
+      }
+    });
+
+    toggleChecklistBtn.addEventListener('click', () => {
+      checklistArea.classList.toggle('visible');
+      toggleChecklistBtn.classList.toggle('active');
+      if (checklistArea.classList.contains('visible')) {
+        markerPanel.classList.remove('visible');
+        toggleMarkerBtn.classList.remove('active');
+      }
+    });
+
+    toggleMediaBtn.addEventListener('click', () => {
+      const isVisible = mediaSection.style.display === 'block';
+      mediaSection.style.display = isVisible ? 'none' : 'block';
+      toggleMediaBtn.classList.toggle('active');
+    });
+
+    // Eventos do Marcador
+    markerColorInput.addEventListener('input', (e) => {
+      state.markerColor = e.target.value;
+      updateMarkerPreview();
+    });
+    markerBrightness.addEventListener('input', (e) => {
+      state.markerBrightness = parseInt(e.target.value);
+      updateMarkerPreview();
+    });
+    markerContrast.addEventListener('input', (e) => {
+      state.markerContrast = parseInt(e.target.value);
+      updateMarkerPreview();
+    });
+
+    // Lógica do Checklist
+    function renderChecklistUI() {
+      checklistItemsDiv.innerHTML = '';
+      state.checklist.forEach((item, index) => {
+        const itemEl = document.createElement('div');
+        itemEl.className = 'checklist-item';
+        
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.checked = item.checked;
+        cb.addEventListener('change', (e) => {
+          state.checklist[index].checked = e.target.checked;
+        });
+
+        const span = document.createElement('span');
+        span.textContent = item.text;
+
+        itemEl.appendChild(cb);
+        itemEl.appendChild(span);
+        checklistItemsDiv.appendChild(itemEl);
+      });
+    }
+
+    addChecklistBtn.addEventListener('click', () => {
+      const text = newChecklistText.value.trim();
+      if (text) {
+        state.checklist.push({ text: text, checked: false });
+        newChecklistText.value = '';
+        renderChecklistUI();
+      }
+    });
+    newChecklistText.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') addChecklistBtn.click();
+    });
+
+    function openNoteModal(hour, existing) {
+      state.editingHour = hour;
+      state.editingNoteId = existing ? existing.id : null;
+      state.pendingMedia = null;
+      
+      // Restaura Marcador
+      state.markerColor = existing && existing.color ? existing.color : '#b52b3b';
+      state.markerBrightness = existing && existing.brightness ? existing.brightness : 100;
+      state.markerContrast = existing && existing.contrast ? existing.contrast : 100;
+      
+      markerColorInput.value = state.markerColor;
+      markerBrightness.value = state.markerBrightness;
+      markerContrast.value = state.markerContrast;
+      updateMarkerPreview();
+
+      // Restaura Checklist
+      state.checklist = existing && existing.checklist ? [...existing.checklist] : [];
+      if (state.checklist.length > 0) {
+        renderChecklistUI();
+        checklistArea.classList.add('visible');
+        toggleChecklistBtn.classList.add('active');
+      } else {
+        checklistArea.classList.remove('visible');
+        toggleChecklistBtn.classList.remove('active');
+      }
+
+      // Restaura Texto e Mídia
+      noteInput.value = existing ? (existing.text || '') : '';
+      if (existing && existing.mediaBlob) {
+        state.pendingMedia = { type: existing.mediaType, blob: existing.mediaBlob };
+        showMediaPreview(state.pendingMedia);
+        mediaSection.style.display = 'block';
+        toggleMediaBtn.classList.add('active');
+      } else {
+        mediaPreview.classList.remove('visible');
+        mediaPreview.innerHTML = '';
+        mediaSection.style.display = 'none';
+        toggleMediaBtn.classList.remove('active');
+      }
+
+      // Esconde o painel de marcador ao abrir
+      markerPanel.classList.remove('visible');
+      toggleMarkerBtn.classList.remove('active');
+
+      document.getElementById('modalSubtitle').textContent =
+        `${state.selectedDate.toLocaleDateString('pt-BR')} às ${pad2(hour)}:00`;
+
+      deleteRow.style.display = existing ? 'block' : 'none';
+
+      overlay.classList.add('active');
+      document.body.style.overflow = 'hidden';
+      resetRecordBtn();
+    }
+
+    function closeNoteModal() {
+      overlay.classList.remove('active');
+      document.body.style.overflow = '';
+      if (state.isRecording) stopRecording();
+      if (state.pendingMedia && state.pendingMedia.url) {
+        URL.revokeObjectURL(state.pendingMedia.url);
+      }
+      mediaPreview.innerHTML = '';
+      mediaPreview.classList.remove('visible');
+      state.editingHour = null;
+      state.editingNoteId = null;
+      state.pendingMedia = null;
+      state.checklist = [];
+    }
+
+    function showMediaPreview(media) {
+      mediaPreview.innerHTML = '';
+      mediaPreview.classList.add('visible');
+
+      const wrap = document.createElement('div');
+      wrap.className = 'preview-wrap';
+
+      const label = document.createElement('div');
+      label.className = 'preview-label';
+      let typeText = media.type === 'audio' ? '🎤 Áudio' : media.type === 'photo' ? '📷 Foto' : '🎬 Vídeo';
+      label.innerHTML = `<span>${typeText}</span>`;
+      
+      const x = document.createElement('button');
+      x.className = 'remove-media';
+      x.textContent = '✕';
+      x.onclick = () => clearMedia();
+      label.appendChild(x);
+      wrap.appendChild(label);
+
+      const url = media.url || URL.createObjectURL(media.blob);
+      media.url = url;
+
+      if (media.type === 'audio') {
+        const audio = document.createElement('audio');
+        audio.controls = true;
+        audio.src = url;
+        wrap.appendChild(audio);
+      } else if (media.type === 'photo') {
+        const img = document.createElement('img');
+        img.src = url;
+        wrap.appendChild(img);
+      } else if (media.type === 'video') {
+        const video = document.createElement('video');
+        video.controls = true;
+        video.playsInline = true;
+        video.src = url;
+        wrap.appendChild(video);
+      }
+      mediaPreview.appendChild(wrap);
+    }
+
+    function clearMedia() {
+      if (state.pendingMedia && state.pendingMedia.url) {
+        URL.revokeObjectURL(state.pendingMedia.url);
+      }
+      state.pendingMedia = null;
+      mediaPreview.classList.remove('visible');
+      mediaPreview.innerHTML = '';
+    }
+
+    document.querySelectorAll('.media-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const action = btn.dataset.action;
+        initAudio();
+        if (action === 'photo') { playKnock(); photoInput.click(); }
+        else if (action === 'video') { playKnock(); videoInput.click(); }
+        else if (action === 'audio') {
+          if (state.isRecording) stopRecording();
+          else await startRecording();
+        } else if (action === 'clear') {
+          if (state.pendingMedia) { playKnock(); clearMedia(); }
+        }
+      });
+    });
+
+    photoInput.addEventListener('change', async (e) => {
+      const f = e.target.files[0];
+      if (!f) return;
+      try {
+        const compressed = await compressImage(f, 1200, 0.85);
+        if (state.pendingMedia && state.pendingMedia.url) URL.revokeObjectURL(state.pendingMedia.url);
+        state.pendingMedia = { type: 'photo', blob: compressed };
+        showMediaPreview(state.pendingMedia);
+        playKnock();
+      } catch (err) { alert('Erro ao processar imagem'); }
+      photoInput.value = '';
+    });
+
+    videoInput.addEventListener('change', (e) => {
+      const f = e.target.files[0];
+      if (!f) return;
+      if (f.size > 30 * 1024 * 1024) {
+        alert('Vídeo muito grande (máx 30MB).');
+        videoInput.value = '';
+        return;
+      }
+      if (state.pendingMedia && state.pendingMedia.url) URL.revokeObjectURL(state.pendingMedia.url);
+      state.pendingMedia = { type: 'video', blob: f };
+      showMediaPreview(state.pendingMedia);
+      playKnock();
+      videoInput.value = '';
+    });
+
+    function compressImage(file, maxDim, quality) {
+      return new Promise((res, rej) => {
+        const img = new Image();
+        img.onload = () => {
+          let { width, height } = img;
+          if (width > maxDim || height > maxDim) {
+            const ratio = Math.min(maxDim / width, maxDim / height);
+            width = Math.round(width * ratio);
+            height = Math.round(height * ratio);
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = width; canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+          canvas.toBlob(blob => res(blob), 'image/jpeg', quality);
+        };
+        img.onerror = rej;
+        img.src = URL.createObjectURL(file);
+      });
+    }
+
+    async function startRecording() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        state.recordingStream = stream;
+        let mimeType = '';
+        if (typeof MediaRecorder !== 'undefined') {
+          const candidates = ['audio/mp4', 'audio/aac', 'audio/webm;codecs=opus', 'audio/webm'];
+          for (const c of candidates) {
+            if (MediaRecorder.isTypeSupported(c)) { mimeType = c; break; }
+          }
+        } else {
+          alert('Gravação não suportada');
+          stream.getTracks().forEach(t => t.stop());
+          return;
+        }
+
+        state.mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
+        state.audioChunks = [];
+
+        state.mediaRecorder.ondataavailable = (e) => {
+          if (e.data.size > 0) state.audioChunks.push(e.data);
+        };
+        state.mediaRecorder.onstop = () => {
+          const blob = new Blob(state.audioChunks, { type: state.mediaRecorder.mimeType });
+          if (state.pendingMedia && state.pendingMedia.url) URL.revokeObjectURL(state.pendingMedia.url);
+          state.pendingMedia = { type: 'audio', blob };
+          showMediaPreview(state.pendingMedia);
+          if (state.recordingStream) {
+            state.recordingStream.getTracks().forEach(t => t.stop());
+            state.recordingStream = null;
+          }
+          state.isRecording = false;
+          resetRecordBtn();
+          playSaveChime();
+        };
+
+        state.mediaRecorder.start();
+        state.isRecording = true;
+        audioBtn.classList.add('recording');
+        audioBtnLabel.textContent = 'Parar';
+      } catch (err) {
+        alert('Não foi possível acessar o microfone.');
+      }
+    }
+
+    function stopRecording() {
+      if (state.mediaRecorder && state.mediaRecorder.state !== 'inactive') {
+        state.mediaRecorder.stop();
+      }
+    }
+
+    function resetRecordBtn() {
+      audioBtn.classList.remove('recording');
+      audioBtnLabel.textContent = 'Áudio';
+    }
+
+    /* ============================================================
+       11. SALVAR / APAGAR
+       ============================================================ */
+    document.getElementById('cancelBtn').addEventListener('click', () => { playKnock(); closeNoteModal(); });
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) { playKnock(); closeNoteModal(); }
+    });
+
+    document.getElementById('saveBtn').addEventListener('click', async () => {
+      const text = noteInput.value.trim();
+      const hasMedia = !!state.pendingMedia;
+      const hasColor = state.markerColor !== '#b52b3b' || state.markerBrightness !== 100 || state.markerContrast !== 100;
+      const hasChecklist = state.checklist.length > 0;
+
+      if (!text && !hasMedia && !hasColor && !hasChecklist) {
+        alert('Escreva algo ou adicione um detalhe :)');
+        return;
+      }
+
+      const dk = dateKey(state.selectedDate);
+      const payload = {
+        date: dk,
+        hour: state.editingHour,
+        text: text,
+        color: hasColor ? state.markerColor : null,
+        brightness: hasColor ? state.markerBrightness : null,
+        contrast: hasColor ? state.markerContrast : null,
+        checklist: state.checklist,
+        mediaType: state.pendingMedia ? state.pendingMedia.type : null,
+        mediaBlob: state.pendingMedia ? state.pendingMedia.blob : null
+      };
+
+      try {
+        if (state.editingNoteId) {
+          await dbUpdate(state.editingNoteId, payload);
+        } else {
+          await dbAdd(payload);
+        }
+        await loadNotesForDate(dk);
+        closeNoteModal();
+        renderCalendar();
+        renderHourlyList();
+        playSaveChime();
+        if (navigator.vibrate) navigator.vibrate(15);
+      } catch (err) {
+        alert('Erro ao salvar.');
+      }
+    });
+
+    document.getElementById('deleteBtn').addEventListener('click', async () => {
+      if (!state.editingNoteId) { closeNoteModal(); return; }
+      try {
+        await dbDelete(state.editingNoteId);
+        const dk = dateKey(state.selectedDate);
+        await loadNotesForDate(dk);
+        closeNoteModal();
+        renderCalendar();
+        renderHourlyList();
+        playKnock();
+      } catch (err) {
+        alert('Erro ao apagar');
+      }
+    });
+
+    /* ============================================================
+       12. CARREGAR NOTAS
+       ============================================================ */
+    async function loadNotesForDate(dk) {
+      try {
+        const notes = await dbGetByDate(dk);
+        state.notesCache[dk] = notes;
+      } catch (e) {
+        state.notesCache[dk] = [];
+      }
+    }
+
+    /* ============================================================
+       13. TRANSIÇÃO DE MÊS E SWIPE
+       ============================================================ */
+    async function changeMonth(direction) {
+      if (state.monthAnimating) return;
+      state.monthAnimating = true;
+      
+      const grid = document.getElementById('calendarGrid');
+      grid.style.transition = 'opacity 0.2s';
+      grid.style.opacity = '0';
+      
+      await wait(200);
+
+      state.month += direction;
+      if (state.month > 11) { state.month = 0; state.year++; }
+      if (state.month < 0) { state.month = 11; state.year--; }
+      
+      renderCalendar();
+
+      grid.style.opacity = '1';
+      await wait(200);
+      
+      grid.style.transition = '';
+      state.monthAnimating = false;
+    }
+
+    document.getElementById('prevMonth').addEventListener('click', () => { if (!state.monthAnimating) changeMonth(-1); });
+    document.getElementById('nextMonth').addEventListener('click', () => { if (!state.monthAnimating) changeMonth(1); });
+
+    let touchStartX = 0, touchStartY = 0, touchStartTime = 0;
+    let suppressClick = false;
+    const calendarCard = document.getElementById('calendarCard');
+
+    calendarCard.addEventListener('touchstart', (e) => {
+      if (e.touches.length !== 1) return;
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+      touchStartTime = Date.now();
+      suppressClick = false;
+    }, { passive: true });
+
+    calendarCard.addEventListener('touchend', (e) => {
+      if (e.touches.length > 0) return;
+      const endX = e.changedTouches[0].clientX;
+      const endY = e.changedTouches[0].clientY;
+      const dx = endX - touchStartX;
+      const dy = endY - touchStartY;
+      const dt = Date.now() - touchStartTime;
+      if (Math.abs(dx) > Math.abs(dy) * 1.4 && Math.abs(dx) > 50 && dt < 700) {
+        suppressClick = true;
+        setTimeout(() => { suppressClick = false; }, 450);
+        if (dx < 0) changeMonth(1);
+        else changeMonth(-1);
+      }
+    }, { passive: true });
+
+    /* ============================================================
+       14. INIT
+       ============================================================ */
+    async function init() {
+      try {
+        await openDB();
+        
+        const todayDk = dateKey(state.selectedDate);
+        await loadNotesForDate(todayDk);
+
+        const y = state.year, m = state.month;
+        const last = new Date(y, m + 1, 0).getDate();
+        const promises = [];
+        for (let d = 1; d <= last; d++) {
+          const dk = dateKey(new Date(y, m, d));
+          if (!state.notesCache[dk]) promises.push(loadNotesForDate(dk));
+        }
+        await Promise.all(promises);
+
+        renderCalendar();
+        updateClock();
+        updateHeaderFlower(state.selectedDate.getDate());
+        initLocation();
+      } catch (e) {
+        alert('Erro ao iniciar o app.');
+        console.error(e);
+      }
+    }
+    init();
+
+  </script>
+</body>
+</html>
